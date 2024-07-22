@@ -1,0 +1,13 @@
+black==24.4.2
+click==8.1.7
+cryptography==43.0.0
+mypy-extensions==1.0.0
+pytest==8.3.1
+requests==2.32.3
+requests-toolbelt==1.0.0
+tomli==2.0.1
+twine==5.1.1
+typing_extensions==4.12.2
+urllib3==2.2.2
+pydantic==2.8.2
+pydantic_core==2.20.1
