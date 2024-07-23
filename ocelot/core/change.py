@@ -17,3 +17,7 @@ class Change(BaseModel):
     operation: str
     column: str
     status: ChangeStatus = ChangeStatus.PENDING
+
+    def apply(self):
+        raise NotImplementedError
+

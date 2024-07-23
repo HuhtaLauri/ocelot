@@ -1,0 +1,32 @@
+version: "3.7"
+
+services:
+  db-dev:
+    image: postgres:15
+    container_name: db-dev
+    environment:
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - db-dev-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+
+  db-prod:
+    image: postgres:15
+    container_name: db-prod
+    environment:
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - db-prod-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  db-dev-volume:
+  db-prod-volume:
