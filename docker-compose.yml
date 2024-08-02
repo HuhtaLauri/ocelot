@@ -13,6 +13,8 @@ services:
       interval: 10s
       retries: 5
       start_period: 5s
+    ports:
+      - "15432:5432"
 
   db-prod:
     image: postgres:15
@@ -26,6 +28,8 @@ services:
       interval: 10s
       retries: 5
       start_period: 5s
+    ports:
+      - "25432:5432"
 
 volumes:
   db-dev-volume:

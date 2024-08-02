@@ -21,3 +21,7 @@ class Change(BaseModel):
     def apply(self):
         raise NotImplementedError
 
+    def revert(self):
+        raise NotImplementedError
+
+
