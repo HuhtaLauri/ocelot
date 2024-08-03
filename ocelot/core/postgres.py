@@ -1,7 +1,6 @@
 from ocelot.core.utils import cursor
 from dotenv import load_dotenv
 import os
-from ocelot.core.utils import db_result_to_json
 from ocelot.core.database import Database
 from tqdm import tqdm
 from sqlalchemy import Table, Column, String
@@ -130,23 +129,55 @@ class PostgresDatabase(Database):
         query = f"""
             SELECT *
             FROM information_schema.tables
+            WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
         """ 
 
         with cursor(self.connections_string) as cur:
             cur.execute(query)
-            result_json = db_result_to_json(cur)
+            result_json = self.db_result_to_json(cur)
 
         return result_json
 
     def get_columns_metadata(self):
         query = f"""
-            SELECT *
-            FROM information_schema.columns
+            WITH
+                cte AS (
+                    SELECT c.table_schema,
+                           c.table_name,
+                           c.column_name,
+                           c.data_type,
+                           c.is_nullable,
+                           c.character_maximum_length,
+                           ARRAY_AGG(tc.constraint_type) AS constraints
+                    FROM information_schema.columns c
+                    LEFT JOIN 
+                        information_schema.key_column_usage kcu 
+                        ON c.table_schema = kcu.table_schema
+                        AND c.table_name = kcu.table_name 
+                        AND c.column_name = kcu.column_name
+                    LEFT JOIN 
+                        information_schema.table_constraints tc 
+                        ON kcu.constraint_name = tc.constraint_name 
+                        AND kcu.table_schema = tc.table_schema
+                        AND kcu.table_name = tc.table_name
+                    WHERE c.table_schema NOT IN ('information_schema', 'pg_catalog')
+                    GROUP BY c.table_schema,
+                             c.table_name,
+                             c.column_name,
+                             c.data_type,
+                             c.is_nullable,
+                             c.character_maximum_length
+                    )
+                SELECT *,
+                    CASE WHEN 'PRIMARY KEY' = ANY(constraints) THEN TRUE ELSE FALSE END AS primary_key,
+                    CASE WHEN 'UNIQUE' = ANY(constraints) THEN TRUE ELSE FALSE END AS unique_key
+                FROM cte
+                ORDER BY table_schema, table_name;
         """
 
         with cursor(self.connections_string) as cur:
             cur.execute(query)
-            result_json = db_result_to_json(cur)
+            result_json = self.db_result_to_json(cur)
 
         return result_json
 
@@ -171,11 +202,25 @@ class PostgresDatabase(Database):
             # Add columns
             for column in table_column_json:
                 column_type = postgres_types_to_sqlalchemy.get(str(column["data_type"]).upper(), String)
-                print(column_type)
                 if column_type in [ARRAY]:
-                    table_obj.append_column(Column(column["column_name"], ARRAY(String)))
+                    table_obj.append_column(
+                        Column(
+                            column["column_name"],
+                            ARRAY(String),
+                            primary_key=column["primary_key"],
+                            unique=column["unique_key"]
+
+                        )
+                    )
                 else:
-                    table_obj.append_column(Column(column["column_name"], column_type))
+                    table_obj.append_column(
+                        Column(
+                            column["column_name"],
+                            column_type,
+                            primary_key=column["primary_key"],
+                            unique=column["unique_key"]
+                        )
+                    )
 
             self.tables.append(table_obj)
 
