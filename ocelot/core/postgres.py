@@ -104,22 +104,17 @@ postgres_types_to_sqlalchemy = {
     "TSTZRANGE": TSTZRANGE,
     "TSVECTOR": TSVECTOR,
     "UUID": UUID,
-    "VARCHAR": VARCHAR
+    "VARCHAR": VARCHAR,
 }
 
 load_dotenv()
 
-class Base(DeclarativeBase):
-    pass
 
 class PostgresDatabase(Database):
 
-    def __init__(self):
+    def __init__(self, connection_string):
         super().__init__()
-        self.connections_string = os.environ.get(
-            "CONNECTION_STRING",
-            "postgresql://postgres:postgres@localhost:5432/postgres"
-        )
+        self.connections_string = connection_string
         self.tables_metadata = self.get_tables_metadata()
         self.columns_metadata = self.get_columns_metadata()
 
@@ -130,7 +125,7 @@ class PostgresDatabase(Database):
             SELECT *
             FROM information_schema.tables
             WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-        """ 
+        """
 
         with cursor(self.connections_string) as cur:
             cur.execute(query)
@@ -181,7 +176,6 @@ class PostgresDatabase(Database):
 
         return result_json
 
-
     def populate_table_data(self):
         """
         Creates table objects from metadata
@@ -191,36 +185,41 @@ class PostgresDatabase(Database):
             table_name = table["table_name"]
             schema_name = table["table_schema"]
 
-            table_obj = Table(table_name, Base.metadata)
-
+            table_obj = Table(table_name, self.base.metadata, schema=schema_name)
             # Get only relevant column data
             table_column_json = []
             for metadata in self.columns_metadata:
-                if metadata["table_name"] == table_name and metadata["table_schema"] == schema_name:
+                if (
+                    metadata["table_name"] == table_name
+                    and metadata["table_schema"] == schema_name
+                ):
                     table_column_json.append(metadata)
 
             # Add columns
             for column in table_column_json:
-                column_type = postgres_types_to_sqlalchemy.get(str(column["data_type"]).upper(), String)
+                column_type = postgres_types_to_sqlalchemy.get(
+                    str(column["data_type"]).upper(), String
+                )
                 if column_type in [ARRAY]:
                     table_obj.append_column(
                         Column(
                             column["column_name"],
                             ARRAY(String),
                             primary_key=column["primary_key"],
-                            unique=column["unique_key"]
-
+                            unique=column["unique_key"],
                         )
                     )
                 else:
+                    if column["character_maximum_length"]:
+                        column_type = column_type(column["character_maximum_length"])
+
                     table_obj.append_column(
                         Column(
                             column["column_name"],
                             column_type,
                             primary_key=column["primary_key"],
-                            unique=column["unique_key"]
+                            unique=column["unique_key"],
                         )
                     )
 
             self.tables.append(table_obj)
-

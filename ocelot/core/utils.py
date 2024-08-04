@@ -17,6 +17,3 @@ def cursor(connection_string: str, commit: bool = False):
         if commit:
             conn.commit()
         conn.close()
-
-
-

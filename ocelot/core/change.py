@@ -12,10 +12,15 @@ class ChangeStatus(Enum):
         return self.name
 
 
+class Operation(Enum):
+    ADD = "add"
+    DROP = "drop"
+    ALTER = "alter"
+
+
 class Change(BaseModel):
     id: UUID = uuid4()
-    operation: str
-    column: str
+    operation: Operation
     status: ChangeStatus = ChangeStatus.PENDING
 
     def apply(self):
@@ -25,3 +30,13 @@ class Change(BaseModel):
         raise NotImplementedError
 
 
+class TableChange(Change):
+    table_id: str
+
+    def __str__(self):
+        return f"{self.table_id} - {self.operation} - {self.status}"
+
+
+class ColumnChange(Change):
+    table_id: str
+    column_id: str
