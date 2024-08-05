@@ -1,10 +1,7 @@
 from ocelot.core.utils import cursor
 from dotenv import load_dotenv
-import os
 from ocelot.core.database import Database
-from tqdm import tqdm
 from sqlalchemy import Table, Column, String
-from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.dialects.postgresql import (
     ARRAY,
     BIGINT,
@@ -181,7 +178,7 @@ class PostgresDatabase(Database):
         Creates table objects from metadata
         and appends them to self.tables list
         """
-        for table in tqdm(self.tables_metadata):
+        for table in self.tables_metadata:
             table_name = table["table_name"]
             schema_name = table["table_schema"]
 

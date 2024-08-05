@@ -5,7 +5,7 @@ from psycopg2.errors import DataError
 from sqlalchemy import MetaData
 from sqlalchemy.orm import declarative_base
 from ocelot.core.diff import Diff
-from ocelot.core.change import TableChange, ColumnChange, Operation
+from ocelot.core.change import TableChange, ColumnChange, OperationType
 
 
 class Database:
@@ -23,9 +23,8 @@ class Database:
         to diff.changes
         """
         diff = Diff()
-
-        this_tables = set(self.base.metadata.tables.keys())
-        other_tables = set(df_2.base.metadata.tables.keys())
+        this_tables = set(self.base.metadata.tables)
+        other_tables = set(df_2.base.metadata.tables)
 
         common_tables = this_tables.intersection(other_tables)
         new_tables = this_tables.difference(other_tables)
@@ -33,9 +32,14 @@ class Database:
 
         if new_tables:
             for table in new_tables:
-                print(table)
-                change = TableChange(operation=Operation.ADD, table_id=table)
-                print(change)
+                add_table = self.base.metadata.tables[table]
+                change = TableChange(operation=OperationType.ADD, table=add_table)
+                diff.add_change(change)
+
+        if dropped_tables:
+            for table in dropped_tables:
+                drop_table = df_2.base.metadata.tables[table]
+                change = TableChange(operation=OperationType.DROP, table=drop_table)
                 diff.add_change(change)
 
         return diff
