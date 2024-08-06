@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from sqlalchemy import Table
+from sqlalchemy import Column, Table
 from psycopg2.extensions import cursor
 from psycopg2.errors import DataError
 from sqlalchemy import MetaData
@@ -14,7 +14,7 @@ class Database:
         self.sync_databases = []
         self.base = declarative_base(metadata=MetaData())
 
-    def compare_tables(self, df_2: "Database") -> Diff:
+    def compare_tables(self, db2: "Database") -> Diff:
         """
         Compare the existing of tables by schema and tables
         with self and passed Database
@@ -24,11 +24,11 @@ class Database:
         """
         diff = Diff()
         this_tables = set(self.base.metadata.tables)
-        other_tables = set(df_2.base.metadata.tables)
+        that_tables = set(db2.base.metadata.tables)
 
-        common_tables = this_tables.intersection(other_tables)
-        new_tables = this_tables.difference(other_tables)
-        dropped_tables = other_tables.difference(this_tables)
+        common_tables = this_tables.intersection(that_tables)
+        new_tables = this_tables.difference(that_tables)
+        dropped_tables = that_tables.difference(this_tables)
 
         if new_tables:
             for table in new_tables:
@@ -43,6 +43,29 @@ class Database:
                 diff.add_change(change)
 
         return diff
+
+    def compare_columns(self, db2: "Database") -> Diff:
+        diff = Diff()
+
+        this_columns = set(self.collect_columns())
+        that_columns = set(db2.collect_columns())
+
+        print(this_columns)
+        print(that_columns)
+
+        common_columns = this_columns.intersection(that_columns)
+
+        print(common_columns)
+
+        return diff
+
+    def collect_columns(self) -> List[Column]:
+        columns = []
+        for _, table in self.base.metadata.tables.items():
+            for column in table.columns:
+                columns.append(column)
+
+        return columns
 
     @staticmethod
     def db_result_to_json(cursor: cursor) -> List[Dict[str, Any]]:

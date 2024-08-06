@@ -1,8 +1,11 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, model_validator, field_validator, ValidationError
 from enum import Enum
 from uuid import UUID, uuid4
-from sqlalchemy.sql.schema import Table
+import sqlalchemy
+from sqlalchemy.sql.schema import Table, Column
 from typing import Type
+from sqlalchemy.schema import CreateTable, DropTable
+from sqlalchemy.sql import ddl
 
 
 class ChangeStatus(Enum):
@@ -28,14 +31,33 @@ class Change(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    def construct_change_query(self):
-        pass
+    def construct_table_change_query(self):
+        if not isinstance(self, TableChange):
+            raise TypeError("Invalid Type. Must be an instance of TableChange class")
+
+        operation_mapping = {
+            OperationType.ADD: self.construct_add_table_query,
+            OperationType.DROP: self.construct_drop_table_query,
+        }
+
+        query_func = operation_mapping.get(self.operation, None)
+
+        if query_func is None:
+            raise ValueError(f"Unsupported operation: {self.operation}")
+
+        return query_func()
 
     def apply(self):
         raise NotImplementedError
 
     def revert(self):
         raise NotImplementedError
+
+    def construct_add_table_query(self) -> ddl.CreateTable:
+        return CreateTable(self.table)
+
+    def construct_drop_table_query(self) -> ddl.DropTable:
+        return DropTable(self.table)
 
 
 class TableChange(Change):
@@ -52,5 +74,21 @@ class TableChange(Change):
 
 
 class ColumnChange(Change):
-    table_id: str
-    column_id: str
+    table: Table
+    column: Column
+
+    @model_validator(mode="before")
+    def validate_table_and_column(cls, values):
+        table = values.get("table")
+        column = values.get("column")
+
+        if not table or not column:
+            raise ValueError("Both 'table' and 'column' must be provided")
+
+        if table and not column:
+            raise ValueError("Column must be provided when table is specified")
+
+        return values
+
+    def __str__(self):
+        return f"{str(self.table)} - {self.operation} - {self.status}"

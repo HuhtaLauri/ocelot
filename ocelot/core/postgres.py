@@ -1,7 +1,8 @@
-from ocelot.core.utils import cursor
 from dotenv import load_dotenv
 from ocelot.core.database import Database
 from sqlalchemy import Table, Column, String
+import psycopg2
+from contextlib import contextmanager
 from sqlalchemy.dialects.postgresql import (
     ARRAY,
     BIGINT,
@@ -111,11 +112,28 @@ class PostgresDatabase(Database):
 
     def __init__(self, connection_string):
         super().__init__()
-        self.connections_string = connection_string
+        self.connection_string = connection_string
         self.tables_metadata = self.get_tables_metadata()
         self.columns_metadata = self.get_columns_metadata()
 
         self.populate_table_data()
+
+    @contextmanager
+    def cursor(self, commit: bool = False):
+        conn = psycopg2.connect(self.connection_string)
+        conn.autocommit = False
+        cursor = conn.cursor()
+
+        try:
+            yield cursor
+            if commit:
+                conn.commit()
+        except psycopg2.DatabaseError as err:
+            conn.rollback()
+            raise err
+        finally:
+            cursor.close()
+            conn.close()
 
     def get_tables_metadata(self):
         query = f"""
@@ -124,7 +142,7 @@ class PostgresDatabase(Database):
             WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
         """
 
-        with cursor(self.connections_string) as cur:
+        with self.cursor() as cur:
             cur.execute(query)
             result_json = self.db_result_to_json(cur)
 
@@ -167,7 +185,7 @@ class PostgresDatabase(Database):
                 ORDER BY table_schema, table_name;
         """
 
-        with cursor(self.connections_string) as cur:
+        with self.cursor() as cur:
             cur.execute(query)
             result_json = self.db_result_to_json(cur)
 
